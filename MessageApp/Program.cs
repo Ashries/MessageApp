@@ -1,6 +1,7 @@
 using MessageApp.Data;
 using MessageApp.Interfaces;
 using MessageApp.Services;
+using MessageApp.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,9 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Add logging
+builder.Services.AddLogging();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
@@ -37,6 +41,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Add custom middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseCors("AllowAll");
 app.UseHttpsRedirection();
@@ -48,13 +56,13 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<MessageContext>();
     context.Database.EnsureCreated();
-
+    
     // Add sample data
     if (!context.Users.Any())
     {
-        context.Users.Add(new MessageApp.Models.User
-        {
-            Username = "testuser",
+        context.Users.Add(new MessageApp.Models.User 
+        { 
+            Username = "testuser", 
             Password = BCrypt.Net.BCrypt.HashPassword("password123"),
             FirstName = "Test",
             LastName = "User"

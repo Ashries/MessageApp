@@ -2,6 +2,7 @@ using MessageApp.Data;
 using MessageApp.Interfaces;
 using MessageApp.Services;
 using MessageApp.Middleware;
+using MessageApp.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,11 +12,16 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add Entity Framework (Using InMemory database for development)
+// Add Entity Framework (Using SQL Server)
 builder.Services.AddDbContext<MessageContext>(options =>
-    options.UseInMemoryDatabase("MessageAppDb"));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Register repositories
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 
 // Register services
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 
@@ -42,7 +48,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Add custom middleware
+// Add custom middleware - API KEY FIRST
+app.UseMiddleware<ApiKeyMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
@@ -56,13 +63,13 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<MessageContext>();
     context.Database.EnsureCreated();
-    
+
     // Add sample data
     if (!context.Users.Any())
     {
-        context.Users.Add(new MessageApp.Models.User 
-        { 
-            Username = "testuser", 
+        context.Users.Add(new MessageApp.Models.User
+        {
+            Username = "testuser",
             Password = BCrypt.Net.BCrypt.HashPassword("password123"),
             FirstName = "Test",
             LastName = "User"

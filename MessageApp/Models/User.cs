@@ -15,6 +15,8 @@ namespace MessageApp.Models
         [Required]
         public string Password { get; set; } = string.Empty;
 
+        public byte[] Salt { get; set; } = new byte[0];
+
         [Required]
         [MaxLength(50)]
         public string FirstName { get; set; } = string.Empty;

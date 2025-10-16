@@ -1,34 +1,35 @@
-﻿using MessageApp.Data;
-using MessageApp.Models;
-using MessageApp.DTOs;
+﻿using MessageApp.DTOs;
 using MessageApp.Interfaces;
-using Microsoft.EntityFrameworkCore;
+using MessageApp.Models;
+using MessageApp.Repositories;
 
 namespace MessageApp.Services
 {
     public class MessageService : IMessageService
     {
-        private readonly MessageContext _context;
+        private readonly IMessageRepository _messageRepository;
+        private readonly IUserRepository _userRepository;
 
-        public MessageService(MessageContext context)
+        public MessageService(IMessageRepository messageRepository, IUserRepository userRepository)
         {
-            _context = context;
+            _messageRepository = messageRepository;
+            _userRepository = userRepository;
         }
 
         public async Task<MessageDto?> CreateMessage(CreateMessageDto createMessageDto, int senderId)
         {
-            var sender = await _context.Users.FindAsync(senderId);
+            var sender = await _userRepository.GetByIdAsync(senderId);
             if (sender == null) return null;
 
             if (createMessageDto.ReceiverId.HasValue)
             {
-                var receiver = await _context.Users.FindAsync(createMessageDto.ReceiverId.Value);
+                var receiver = await _userRepository.GetByIdAsync(createMessageDto.ReceiverId.Value);
                 if (receiver == null) return null;
             }
 
             if (createMessageDto.PreviousMessageId.HasValue)
             {
-                var previousMessage = await _context.Messages.FindAsync(createMessageDto.PreviousMessageId.Value);
+                var previousMessage = await _messageRepository.GetByIdAsync(createMessageDto.PreviousMessageId.Value);
                 if (previousMessage == null) return null;
             }
 
@@ -42,156 +43,113 @@ namespace MessageApp.Services
                 SentAt = DateTime.UtcNow
             };
 
-            _context.Messages.Add(message);
-            await _context.SaveChangesAsync();
-
+            await _messageRepository.AddAsync(message);
             return await GetMessageDtoById(message.Id);
         }
 
         public async Task<IEnumerable<MessageDto>> GetPublicMessages()
         {
-            return await _context.Messages
-                .Where(m => m.ReceiverId == null)
-                .Include(m => m.Sender)
-                .OrderByDescending(m => m.SentAt)
-                .Select(m => new MessageDto
+            var messages = await _messageRepository.GetPublicMessagesAsync();
+            return messages.Select(m => new MessageDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Content = m.Content,
+                SentAt = m.SentAt,
+                IsPublic = true,
+                Sender = new UserDto
                 {
-                    Id = m.Id,
-                    Title = m.Title,
-                    Content = m.Content,
-                    SentAt = m.SentAt,
-                    IsPublic = true,
-                    Sender = new UserDto
-                    {
-                        Id = m.Sender.Id,
-                        Username = m.Sender.Username,
-                        FirstName = m.Sender.FirstName,
-                        LastName = m.Sender.LastName
-                    },
-                    PreviousMessageId = m.PreviousMessageId
-                })
-                .ToListAsync();
+                    Id = m.Sender.Id,
+                    Username = m.Sender.Username,
+                    FirstName = m.Sender.FirstName,
+                    LastName = m.Sender.LastName
+                },
+                PreviousMessageId = m.PreviousMessageId
+            });
         }
 
         public async Task<IEnumerable<MessageDto>> GetPrivateMessages(int userId)
         {
-            return await _context.Messages
-                .Where(m => m.ReceiverId == userId || m.SenderId == userId)
-                .Where(m => m.ReceiverId != null)
-                .Include(m => m.Sender)
-                .Include(m => m.Receiver)
-                .OrderByDescending(m => m.SentAt)
-                .Select(m => new MessageDto
+            var messages = await _messageRepository.GetPrivateMessagesAsync(userId);
+            return messages.Select(m => new MessageDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Content = m.Content,
+                SentAt = m.SentAt,
+                IsPublic = false,
+                Sender = new UserDto
                 {
-                    Id = m.Id,
-                    Title = m.Title,
-                    Content = m.Content,
-                    SentAt = m.SentAt,
-                    IsPublic = false,
-                    Sender = new UserDto
-                    {
-                        Id = m.Sender.Id,
-                        Username = m.Sender.Username,
-                        FirstName = m.Sender.FirstName,
-                        LastName = m.Sender.LastName
-                    },
-                    Receiver = m.Receiver != null ? new UserDto
-                    {
-                        Id = m.Receiver.Id,
-                        Username = m.Receiver.Username,
-                        FirstName = m.Receiver.FirstName,
-                        LastName = m.Receiver.LastName
-                    } : null,
-                    PreviousMessageId = m.PreviousMessageId
-                })
-                .ToListAsync();
+                    Id = m.Sender.Id,
+                    Username = m.Sender.Username,
+                    FirstName = m.Sender.FirstName,
+                    LastName = m.Sender.LastName
+                },
+                Receiver = m.Receiver != null ? new UserDto
+                {
+                    Id = m.Receiver.Id,
+                    Username = m.Receiver.Username,
+                    FirstName = m.Receiver.FirstName,
+                    LastName = m.Receiver.LastName
+                } : null,
+                PreviousMessageId = m.PreviousMessageId
+            });
         }
 
         public async Task<IEnumerable<MessageDto>> GetMessageThread(int messageId)
         {
-            var currentMessage = await _context.Messages
-                .Include(m => m.PreviousMessage)
-                .FirstOrDefaultAsync(m => m.Id == messageId);
-
-            if (currentMessage == null) return Enumerable.Empty<MessageDto>();
-
-            while (currentMessage.PreviousMessageId.HasValue)
+            var messages = await _messageRepository.GetMessageThreadAsync(messageId);
+            return messages.Select(m => new MessageDto
             {
-                currentMessage = await _context.Messages
-                    .Include(m => m.PreviousMessage)
-                    .FirstOrDefaultAsync(m => m.Id == currentMessage.PreviousMessageId.Value);
-                if (currentMessage == null) break;
-            }
-
-            var threadMessages = await _context.Messages
-                .Where(m => m.Id == currentMessage.Id || m.PreviousMessageId == currentMessage.Id)
-                .Include(m => m.Sender)
-                .Include(m => m.Receiver)
-                .OrderBy(m => m.SentAt)
-                .Select(m => new MessageDto
+                Id = m.Id,
+                Title = m.Title,
+                Content = m.Content,
+                SentAt = m.SentAt,
+                IsPublic = m.ReceiverId == null,
+                Sender = new UserDto
                 {
-                    Id = m.Id,
-                    Title = m.Title,
-                    Content = m.Content,
-                    SentAt = m.SentAt,
-                    IsPublic = m.ReceiverId == null,
-                    Sender = new UserDto
-                    {
-                        Id = m.Sender.Id,
-                        Username = m.Sender.Username,
-                        FirstName = m.Sender.FirstName,
-                        LastName = m.Sender.LastName
-                    },
-                    Receiver = m.Receiver != null ? new UserDto
-                    {
-                        Id = m.Receiver.Id,
-                        Username = m.Receiver.Username,
-                        FirstName = m.Receiver.FirstName,
-                        LastName = m.Receiver.LastName
-                    } : null,
-                    PreviousMessageId = m.PreviousMessageId
-                })
-                .ToListAsync();
-
-            return threadMessages;
+                    Id = m.Sender.Id,
+                    Username = m.Sender.Username,
+                    FirstName = m.Sender.FirstName,
+                    LastName = m.Sender.LastName
+                },
+                Receiver = m.Receiver != null ? new UserDto
+                {
+                    Id = m.Receiver.Id,
+                    Username = m.Receiver.Username,
+                    FirstName = m.Receiver.FirstName,
+                    LastName = m.Receiver.LastName
+                } : null,
+                PreviousMessageId = m.PreviousMessageId
+            });
         }
 
         public async Task<MessageDto?> UpdateMessage(int messageId, UpdateMessageDto updateMessageDto, int userId)
         {
-            var message = await _context.Messages
-                .Include(m => m.Sender)
-                .Include(m => m.Receiver)
-                .FirstOrDefaultAsync(m => m.Id == messageId);
-
+            var message = await _messageRepository.GetByIdAsync(messageId);
             if (message == null || message.SenderId != userId)
                 return null;
 
             message.Title = updateMessageDto.Title;
             message.Content = updateMessageDto.Content;
 
-            await _context.SaveChangesAsync();
-
+            await _messageRepository.UpdateAsync(message);
             return await GetMessageDtoById(message.Id);
         }
 
         public async Task<bool> DeleteMessage(int messageId, int userId)
         {
-            var message = await _context.Messages.FindAsync(messageId);
+            var message = await _messageRepository.GetByIdAsync(messageId);
             if (message == null || message.SenderId != userId)
                 return false;
 
-            _context.Messages.Remove(message);
-            await _context.SaveChangesAsync();
+            await _messageRepository.DeleteAsync(messageId);
             return true;
         }
 
         public async Task<MessageDto?> GetMessageById(int messageId, int userId)
         {
-            var message = await _context.Messages
-                .Include(m => m.Sender)
-                .Include(m => m.Receiver)
-                .FirstOrDefaultAsync(m => m.Id == messageId);
-
+            var message = await _messageRepository.GetByIdAsync(messageId);
             if (message == null) return null;
 
             if (message.ReceiverId != null && message.SenderId != userId && message.ReceiverId != userId)
@@ -202,34 +160,32 @@ namespace MessageApp.Services
 
         private async Task<MessageDto?> GetMessageDtoById(int messageId)
         {
-            return await _context.Messages
-                .Where(m => m.Id == messageId)
-                .Include(m => m.Sender)
-                .Include(m => m.Receiver)
-                .Select(m => new MessageDto
+            var message = await _messageRepository.GetByIdAsync(messageId);
+            if (message == null) return null;
+
+            return new MessageDto
+            {
+                Id = message.Id,
+                Title = message.Title,
+                Content = message.Content,
+                SentAt = message.SentAt,
+                IsPublic = message.ReceiverId == null,
+                Sender = new UserDto
                 {
-                    Id = m.Id,
-                    Title = m.Title,
-                    Content = m.Content,
-                    SentAt = m.SentAt,
-                    IsPublic = m.ReceiverId == null,
-                    Sender = new UserDto
-                    {
-                        Id = m.Sender.Id,
-                        Username = m.Sender.Username,
-                        FirstName = m.Sender.FirstName,
-                        LastName = m.Sender.LastName
-                    },
-                    Receiver = m.Receiver != null ? new UserDto
-                    {
-                        Id = m.Receiver.Id,
-                        Username = m.Receiver.Username,
-                        FirstName = m.Receiver.FirstName,
-                        LastName = m.Receiver.LastName
-                    } : null,
-                    PreviousMessageId = m.PreviousMessageId
-                })
-                .FirstOrDefaultAsync();
+                    Id = message.Sender.Id,
+                    Username = message.Sender.Username,
+                    FirstName = message.Sender.FirstName,
+                    LastName = message.Sender.LastName
+                },
+                Receiver = message.Receiver != null ? new UserDto
+                {
+                    Id = message.Receiver.Id,
+                    Username = message.Receiver.Username,
+                    FirstName = message.Receiver.FirstName,
+                    LastName = message.Receiver.LastName
+                } : null,
+                PreviousMessageId = message.PreviousMessageId
+            };
         }
     }
 }

@@ -1,36 +1,41 @@
-﻿using MessageApp.Data;
-using MessageApp.Models;
-using MessageApp.DTOs;
+﻿using MessageApp.DTOs;
 using MessageApp.Interfaces;
-using Microsoft.EntityFrameworkCore;
+using MessageApp.Models;
+using MessageApp.Repositories;
 
 namespace MessageApp.Services
 {
     public class UserService : IUserService
     {
-        private readonly MessageContext _context;
+        private readonly IUserRepository _userRepository;
+        private readonly IAuthenticationService _authenticationService;
 
-        public UserService(MessageContext context)
+        public UserService(IUserRepository userRepository, IAuthenticationService authenticationService)
         {
-            _context = context;
+            _userRepository = userRepository;
+            _authenticationService = authenticationService;
         }
 
         public async Task<UserDto?> Register(CreateUserDto createUserDto)
         {
-            if (await _context.Users.AnyAsync(u => u.Username == createUserDto.Username))
+            // Check if username already exists using repository
+            var existingUser = await _userRepository.GetByUsernameAsync(createUserDto.Username);
+            if (existingUser != null)
                 return null;
 
             var user = new User
             {
                 Username = createUserDto.Username,
-                Password = BCrypt.Net.BCrypt.HashPassword(createUserDto.Password),
+                Password = createUserDto.Password,
                 FirstName = createUserDto.FirstName,
                 LastName = createUserDto.LastName,
                 JoinDate = DateTime.UtcNow
             };
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            // Hash password and add salt
+            user = _authenticationService.CreateUserCredentials(user);
+
+            await _userRepository.AddAsync(user);
 
             return new UserDto
             {
@@ -45,12 +50,13 @@ namespace MessageApp.Services
 
         public async Task<UserDto?> Login(LoginDto loginDto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == loginDto.Username);
-            if (user == null || !BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password))
+            var user = await _authenticationService.Authenticate(loginDto.Username, loginDto.Password);
+            if (user == null)
                 return null;
 
+            // Update last login
             user.LastLogin = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _userRepository.UpdateAsync(user);
 
             return new UserDto
             {
@@ -65,7 +71,7 @@ namespace MessageApp.Services
 
         public async Task<UserDto?> GetUserById(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _userRepository.GetByIdAsync(id);
             if (user == null) return null;
 
             return new UserDto
@@ -81,17 +87,16 @@ namespace MessageApp.Services
 
         public async Task<IEnumerable<UserDto>> GetAllUsers()
         {
-            return await _context.Users
-                .Select(u => new UserDto
-                {
-                    Id = u.Id,
-                    Username = u.Username,
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    JoinDate = u.JoinDate,
-                    LastLogin = u.LastLogin
-                })
-                .ToListAsync();
+            var users = await _userRepository.GetAllAsync();
+            return users.Select(u => new UserDto
+            {
+                Id = u.Id,
+                Username = u.Username,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                JoinDate = u.JoinDate,
+                LastLogin = u.LastLogin
+            });
         }
     }
 }

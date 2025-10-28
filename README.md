@@ -4,7 +4,7 @@ Viestiappi on backend-viestintäsovellus, joka mahdollistaa käyttäjien lähett
 Ohjemaa käynistetään visual studiossa F5 Sovellus pitäisi käynistyy automaattisistei sellaimissa. Voit tarkistaa nuget controllista: dotnet list package mitä paketteja oli asennettu tähän projektiin. 
 
 
-Testaus postmanissa 
+Testaus postmanissa ja 
 Rekisteröi uusi käyttäjä:
 
 Valitse POST /api/users/register
@@ -55,9 +55,28 @@ GET /api/messages/private         # Käyttäjän yksityisviestit
 GET /api/messages/thread/1        # Viestiketju
 
 
+Käydään läpi tekniiset asiat projektissa
+
+Projektin kansio rakenne
+MessageApp/
+├── Controllers/          # API-kontrollerit
+├── Models/              # Tietomallit
+├── DTOs/                # Data Transfer Objects
+├── Services/            # Liiketoimintalogiikka
+├── Repositories/        # Tietokantakäsittely
+├── Interfaces/          # Rajapinnat
+├── Data/               # Tietokantakonteksti
+├── Middleware/         # HTTP-middleware
+└── Program.cs          # Sovelluksen konfiguraatio
+Jokainen kansio on erikoistunut tiettyyn tehtävään, mikä tekee koodista helpommin ylläpidettävää.
 
 
 
 
+
+Käyttäjä → API → Middleware → Controller → Service → Repository → Tietokanta
+    ↓        ↓         ↓          ↓           ↓          ↓           ↓
+   HTTP   API-key   Logging   Validointi  Business   Data Access   Tallennus
+   Pyyntö  Tarkistus           Logic
 
 

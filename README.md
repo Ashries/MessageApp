@@ -12,4 +12,29 @@ Valitse POST /api/users/register
 
 Syötä käyttäjätiedot
 
-"
+Valitse POST /api/users/login
+
+Voit nyt kirjautua sisään käytttäjään 
+
+POST /api/messages 
+
+Viestien kähettäminen:
+
+POST /api/messages
+X-API-Key: your-secret-api-key-12345
+X-User-Id: 1
+Content-Type: application/json
+
+{
+  "title": "Hei maailma!",
+  "content": "Tämä on julkinen viesti",
+  "receiverId": null
+}
+
+Viestien hakeminen postaminissa testausta varten
+
+GET /api/messages/public          # Kaikki julkiset viestit
+GET /api/messages/private         # Käyttäjän yksityisviestit
+GET /api/messages/thread/1        # Viestiketju
+
+

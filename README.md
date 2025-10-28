@@ -73,10 +73,51 @@ Jokainen kansio on erikoistunut tiettyyn tehtävään, mikä tekee koodista help
 
 
 
+Vaihettais kuvaus ohjelmasta
 
-Käyttäjä → API → Middleware → Controller → Service → Repository → Tietokanta
-    ↓        ↓         ↓          ↓           ↓          ↓           ↓
-   HTTP   API-key   Logging   Validointi  Business   Data Access   Tallennus
-   Pyyntö  Tarkistus           Logic
+Vaihe 1: HTTP-pyyntö saapuu
+
+Käyttäjä lähettää POST-pyynnön osoitteeseen /api/messages
+Pyynnössä on:
+API-avain headerissa (X-API-Key)
+Käyttäjän ID headerissa (X-User-Id)
+Viestin data JSON-muodossa
 
 
+Vaihe 2: Middleware-käsittely
+ApiKeyMiddleware: Tarkistaa että API-avain on oikea
+RequestLoggingMiddleware: Kirjaa tiedot pyynnöstä (kuka, mitä, milloin)
+ExceptionHandlingMiddleware: Ottaa kiinni mahdolliset virheet
+
+
+Vaihe 3: Kontrolleri
+MessagesController vastaanottaa pyynnön
+Hakee käyttäjätiedot X-User-Id headerista
+Validoida että kaikki tarvittava data on annettu
+
+
+
+Vaihe 4: Palvelukerros
+MessageService käsittelee liiketoimintalogiikan:
+Tarkistaa että lähettäjä on olemassa
+Tarkistaa että vastaanottaja on olemassa (jos yksityisviesti)
+Varmistaa että edellinen viesti on olemassa (jos vastaus)
+
+
+
+
+Vaihe 5: Tietokantakäsittely
+MessageRepository tallentaa viestin:
+Luo uuden Message-olion
+Asettaa ajankohdan (SentAt)
+tallentaa tietokantaan Entity Frameworkin avulla
+
+
+
+Vaihe 6: Vastaus
+Sovellus palauttaa HTTP 201 Created -statuskoodin
+Vastauksessa on luodun viestin tiedot:
+Viestin ID
+Otsikko ja sisältö
+Lähettäjän tiedot
+Vastaanottajan tiedot (jos yksityisviesti)

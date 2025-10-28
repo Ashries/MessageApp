@@ -27,11 +27,11 @@ X-API-Key: your-secret-api-key-12345
 X-User-Id: 1
 Content-Type: application/json
 
-{
+
   "title": "Hei maailma!",
   "content": "Tämä on julkinen viesti",
   "receiverId": null
-}
+
 
 
 
@@ -41,12 +41,12 @@ Muokkaa headers
 Content-Type: application/json
 X-API-Key: your-secret-api-key-12345
 X-User-Id: 1
-{
+
   "title": "Salainen viesti kakkoselle",
   "content": "Tämä viesti on vain sinulle",
   "receiverId": 2,
   "previousMessageId": null
-}
+
 
 Viestien hakeminen postaminissa testausta varten
 

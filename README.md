@@ -114,6 +114,9 @@ tallentaa tietokantaan Entity Frameworkin avulla
 
 
 
+
+
+
 Vaihe 6: Vastaus
 Sovellus palauttaa HTTP 201 Created -statuskoodin
 Vastauksessa on luodun viestin tiedot:
@@ -121,3 +124,15 @@ Viestin ID
 Otsikko ja sisältö
 Lähettäjän tiedot
 Vastaanottajan tiedot (jos yksityisviesti)
+
+
+MITEN PARANNETAAN FRONT END?
+
+-Jotenkin voisi integroida kuvat ja emojit teksti viesteihin
+
+Front endilla voi kehittää ulkonäkö ja käyttäjien kokemus parantaminen monella tavalla kuten:
+
+-Push-ilmoitukset uusista viesteistä
+.Viestihaku ja suodatus
+-Käyttäjäprofiilit ja avatarit
+-Helppo käyttää selkeällä käyttöliittymällä
